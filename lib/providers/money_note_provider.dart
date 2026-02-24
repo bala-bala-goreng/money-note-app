@@ -41,6 +41,11 @@ class MoneyNoteProvider extends ChangeNotifier {
     await loadAll();
   }
 
+  Future<void> updateTransaction(TransactionRecord t) async {
+    await _db.updateTransaction(t);
+    await loadAll();
+  }
+
   Future<void> addCategory(models.Category c) async {
     await _db.insertCategory(c);
     await loadAll();
@@ -62,5 +67,18 @@ class MoneyNoteProvider extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> resetData() async {
+    await _db.resetData();
+    await loadAll();
+  }
+
+  Future<String> exportData({String? targetDirectoryPath}) async =>
+      _db.exportData(targetDirectoryPath: targetDirectoryPath);
+
+  Future<void> importData(String path) async {
+    await _db.importData(path);
+    await loadAll();
   }
 }

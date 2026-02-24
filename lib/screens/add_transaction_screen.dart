@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/money_note_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart' as m;
 import '../utils/category_icons.dart';
+import '../utils/decimal_input_formatter.dart';
 
 /// Screen to add a new income or expense transaction.
 /// User picks type (income/expense), category, enters description and amount.
 class AddTransactionScreen extends StatefulWidget {
-  const AddTransactionScreen({super.key});
+  /// Called after a transaction is saved successfully (e.g. switch to Home tab).
+  final VoidCallback? onSaved;
+
+  const AddTransactionScreen({super.key, this.onSaved});
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
@@ -17,9 +22,11 @@ class AddTransactionScreen extends StatefulWidget {
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
   bool _isIncome = true;
   m.Category? _selectedCategory;
+  DateTime _date = DateTime.now(); // Default to today if not picked
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
   List<m.Category> _categories = [];
+  static final _dateFormat = DateFormat('d MMM y');
 
   @override
   void initState() {
@@ -60,7 +67,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Future<void> _save() async {
     final desc = _descriptionController.text.trim();
     final amountStr = _amountController.text.trim();
-    if (desc.isEmpty || amountStr.isEmpty || _selectedCategory == null) {
+    if (desc.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Description is required')),
+      );
+      return;
+    }
+    if (amountStr.isEmpty || _selectedCategory == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields')),
       );
@@ -74,18 +87,22 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return;
     }
 
+    final transactionDate = DateTime(_date.year, _date.month, _date.day);
     final t = TransactionRecord(
       description: desc,
       amount: amount,
       categoryId: _selectedCategory!.id!,
+      transactionDate: transactionDate,
       createdAt: DateTime.now(),
       isIncome: _isIncome,
     );
 
     await context.read<MoneyNoteProvider>().addTransaction(t);
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Transaction added'), backgroundColor: Colors.green),
+    );
+    widget.onSaved?.call();
   }
 
   @override
@@ -110,7 +127,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
             // Category dropdown
             DropdownButtonFormField<m.Category>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               decoration: const InputDecoration(labelText: 'Category'),
               items: _categories
                   .map((c) => DropdownMenuItem(
@@ -128,25 +145,42 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Description
+            // Date (default today)
+            OutlinedButton.icon(
+              icon: const Icon(Icons.calendar_today, size: 20),
+              label: Text(_dateFormat.format(_date)),
+              onPressed: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (d != null) setState(() => _date = d);
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Description (required)
             TextField(
               controller: _descriptionController,
               decoration: const InputDecoration(
-                labelText: 'Description',
+                labelText: 'Description *',
                 hintText: 'e.g. Lunch at cafe',
               ),
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: 16),
 
-            // Amount
+            // Amount (decimal, max 2 places)
             TextField(
               controller: _amountController,
               decoration: const InputDecoration(
                 labelText: 'Amount',
-                hintText: '0',
+                hintText: '0.00',
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [DecimalInputFormatter(decimalPlaces: 2)],
             ),
             const SizedBox(height: 32),
 

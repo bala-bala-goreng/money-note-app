@@ -42,6 +42,14 @@ dependencies:
   # State management - keeps UI in sync with data
   provider: ^6.1.2
 
+  # Persist settings (e.g. currency)
+  shared_preferences: ^2.2.2
+
+  # Export/import: app dirs and file picker
+  path_provider: ^2.1.2
+  file_picker: ^8.0.0
+  permission_handler: ^11.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

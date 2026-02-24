@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/money_note_provider.dart';
-import 'screens/dashboard_screen.dart';
+import 'providers/settings_provider.dart';
+import 'screens/home_shell.dart';
 
 void main() {
   runApp(const MoneyNoteApp());
 }
 
-/// Root widget. Wrap app in ChangeNotifierProvider so any screen can
-/// access MoneyNoteProvider via `context.read<MoneyNoteProvider>()`.
+/// Root widget. Providers for data and settings; home is the bottom-nav shell.
 class MoneyNoteApp extends StatelessWidget {
   const MoneyNoteApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => MoneyNoteProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => MoneyNoteProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ],
       child: MaterialApp(
         title: 'Money Note',
         debugShowCheckedModeBanner: false,
@@ -23,7 +26,7 @@ class MoneyNoteApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
           useMaterial3: true,
         ),
-        home: const DashboardScreen(),
+        home: const HomeShell(),
       ),
     );
   }

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/money_note_provider.dart';
-import 'add_transaction_screen.dart';
-import 'category_management_screen.dart';
+import '../providers/settings_provider.dart';
+import 'balance_detail_screen.dart';
+import 'transaction_detail_screen.dart';
+import '../utils/currency_helper.dart';
 import '../widgets/summary_box.dart';
 import '../widgets/transaction_list.dart';
 
@@ -40,28 +41,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ');
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Money Note'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.category),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CategoryManagementScreen(),
-                ),
-              );
-            },
-            tooltip: 'Manage categories',
-          ),
-        ],
-      ),
-      body: Consumer<MoneyNoteProvider>(
-        builder: (context, provider, _) {
+      appBar: AppBar(title: const Text('Money Note')),
+      body: Consumer2<MoneyNoteProvider, SettingsProvider>(
+        builder: (context, provider, settings, _) {
           // Filter transactions by type for each tab
           final expenses =
               provider.transactions.where((t) => !t.isIncome).toList();
@@ -77,20 +60,38 @@ class _DashboardScreenState extends State<DashboardScreen>
                   children: [
                     SummaryBox(
                       title: 'Expenses',
-                      amount: currencyFormat.format(provider.totalExpense),
+                      amount: formatAmountShort(provider.totalExpense),
                       amountColor: Colors.red,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TransactionDetailScreen(isIncome: false),
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     SummaryBox(
                       title: 'Balance',
-                      amount: currencyFormat.format(provider.balance),
+                      amount: formatAmountShort(provider.balance),
                       amountColor: Theme.of(context).colorScheme.primary,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BalanceDetailScreen(),
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     SummaryBox(
                       title: 'Income',
-                      amount: currencyFormat.format(provider.totalIncome),
+                      amount: formatAmountShort(provider.totalIncome),
                       amountColor: Colors.green,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TransactionDetailScreen(isIncome: true),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -128,21 +129,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             ],
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AddTransactionScreen(),
-            ),
-          );
-          if (context.mounted) {
-            context.read<MoneyNoteProvider>().loadAll();
-          }
-        },
-        tooltip: 'Add transaction',
-        child: const Icon(Icons.add),
       ),
     );
   }

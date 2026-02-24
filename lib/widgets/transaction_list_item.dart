@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
 import '../utils/category_icons.dart';
+import '../providers/settings_provider.dart';
 
 /// Single row in the transaction list.
 /// Shows: category (with icon), description, amount on the right.
@@ -19,8 +21,9 @@ class TransactionListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ');
     final amountColor = transaction.isIncome ? Colors.green : Colors.red;
+    final formattedAmount = context.read<SettingsProvider>().formatAmount(transaction.amount);
+    final dateStr = DateFormat('d MMM y').format(transaction.transactionDate);
 
     return ListTile(
       leading: CircleAvatar(
@@ -35,12 +38,12 @@ class TransactionListItem extends StatelessWidget {
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(
-        transaction.description,
+        '$dateStr · ${transaction.description}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       trailing: Text(
-        currencyFormat.format(transaction.amount),
+        formattedAmount,
         style: TextStyle(
           fontWeight: FontWeight.bold,
           color: amountColor,

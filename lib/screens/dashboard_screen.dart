@@ -59,13 +59,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             tooltip: 'Manage categories',
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Expenses'),
-            Tab(text: 'Income'),
-          ],
-        ),
       ),
       body: Consumer<MoneyNoteProvider>(
         builder: (context, provider, _) {
@@ -99,6 +92,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                       amount: currencyFormat.format(provider.totalIncome),
                       amountColor: Colors.green,
                     ),
+                  ],
+                ),
+              ),
+              // Tab bar directly below the 3 boxes
+              Material(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: Theme.of(context).colorScheme.primary,
+                  unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                  indicatorColor: Theme.of(context).colorScheme.primary,
+                  tabs: const [
+                    Tab(text: 'Expenses'),
+                    Tab(text: 'Income'),
                   ],
                 ),
               ),

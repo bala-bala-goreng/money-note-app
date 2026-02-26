@@ -1,12 +1,11 @@
-# Money Note App
+# Spendly
 
 A simple app to track your income and expenses. Everything is stored on your device (SQLite). No account, no cloud—just you and your numbers.
 
 **What it does:**
-- Dashboard with three boxes: total expenses, balance, total income
-- Two tabs below: one for expense list, one for income list
-- Add transactions with a category, description, and amount
-- Manage categories (add, edit, pick an icon). Expenses show in red, income in green
+- **Dashboard** – Three summary boxes (total expenses, balance, total income). Tap balance for a breakdown. Two tabs: expense list and income list. Tap a transaction to view or delete it.
+- **Add** – Create income or expense with category, description, and amount.
+- **Settings** – Choose currency, manage categories (add, edit, pick an icon), reset data, or export/import a backup. Expenses use red, income uses green.
 
 ---
 
@@ -32,38 +31,46 @@ Fix whatever it complains about (e.g. “Android SDK not found” → install An
 Roughly how the code is organised:
 
 ```
-money-note-app/
+spendly/
 ├── lib/
-│   ├── main.dart                 → App entry, sets up Provider and theme
+│   ├── main.dart                    → App entry, sets up Providers and theme
 │   ├── models/
-│   │   ├── category.dart         → Category (name, icon, income vs expense)
-│   │   └── transaction.dart     → Single transaction (amount, description, category, date)
+│   │   ├── category.dart             → Category (name, icon, income vs expense)
+│   │   └── transaction.dart          → Single transaction (amount, description, category, date)
 │   ├── database/
-│   │   └── database_helper.dart  → SQLite: create DB, tables, read/write categories & transactions
+│   │   └── database_helper.dart      → SQLite: create DB, tables, read/write categories & transactions
 │   ├── providers/
-│   │   └── money_note_provider.dart  → Loads/saves data, notifies UI when something changes
+│   │   ├── spendly_provider.dart  → Loads/saves data, notifies UI when data changes
+│   │   └── settings_provider.dart    → Currency and other preferences (shared_preferences)
 │   ├── screens/
-│   │   ├── dashboard_screen.dart      → Main screen: 3 boxes + tabs + lists
-│   │   ├── add_transaction_screen.dart → Form to add income/expense
-│   │   └── category_management_screen.dart → List and add/edit categories
+│   │   ├── home_shell.dart           → Bottom nav: Dashboard, Add, Settings
+│   │   ├── dashboard_screen.dart     → 3 summary boxes + expense/income tabs + lists
+│   │   ├── transaction_detail_screen.dart → Expense/Balance/Income/Calendar: filter by date, category, search
+│   │   ├── add_transaction_screen.dart    → Form to add income/expense
+│   │   ├── category_management_screen.dart → List and add/edit categories
+│   │   └── settings_screen.dart      → Currency, categories, reset, export/import, about
 │   ├── widgets/
-│   │   ├── summary_box.dart      → One of the three dashboard cards
-│   │   ├── transaction_list.dart → List of transactions for a tab
+│   │   ├── summary_box.dart          → One of the three dashboard cards
+│   │   ├── transaction_list.dart     → List of transactions for a tab
 │   │   └── transaction_list_item.dart → One row (category, description, amount)
 │   └── utils/
-│       └── category_icons.dart   → Maps icon names to Material icons
+│       ├── category_icons.dart       → Maps icon names to Material icons
+│       ├── currency_helper.dart      → Currency list and formatting
+│       └── decimal_input_formatter.dart → Input formatting for amount fields
 ├── android/    → Android app config and build files
 ├── ios/        → iOS app config and build files
 ├── macos/      → macOS desktop app config (if you added that platform)
 ├── test/
 │   └── widget_test.dart
-└── pubspec.yaml   → Dependencies (Flutter, sqflite, provider, intl, etc.)
+└── pubspec.yaml   → Dependencies (see below)
 ```
 
 **Dependencies (from pubspec):**
 - `sqflite` + `path` – local SQLite database
 - `provider` – state management so the UI updates when data changes
 - `intl` – formatting money and dates
+- `shared_preferences` – persist currency and other settings
+- `path_provider` + `file_picker` + `permission_handler` – export/import backup files
 
 ---
 
@@ -72,7 +79,7 @@ money-note-app/
 ### 1. Get the code and install dependencies
 
 ```bash
-cd money-note-app
+cd spendly
 flutter pub get
 ```
 

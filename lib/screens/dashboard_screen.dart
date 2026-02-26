@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/money_note_provider.dart';
+import '../providers/spendly_provider.dart';
 import '../providers/settings_provider.dart';
-import 'balance_detail_screen.dart';
+import 'add_transaction_screen.dart';
 import 'transaction_detail_screen.dart';
 import '../utils/currency_helper.dart';
 import '../widgets/summary_box.dart';
@@ -29,7 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _tabController = TabController(length: 2, vsync: this);
     // Load data when screen appears
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MoneyNoteProvider>().loadAll();
+      context.read<SpendlyProvider>().loadAll();
     });
   }
 
@@ -42,8 +42,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Money Note')),
-      body: Consumer2<MoneyNoteProvider, SettingsProvider>(
+      appBar: AppBar(
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset('spendly_logo.png', height: 32, fit: BoxFit.contain),
+            const SizedBox(width: 8),
+            const Text('Spendly'),
+          ],
+        ),
+      ),
+      body: Consumer2<SpendlyProvider, SettingsProvider>(
         builder: (context, provider, settings, _) {
           // Filter transactions by type for each tab
           final expenses =
@@ -65,7 +74,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const TransactionDetailScreen(isIncome: false),
+                          builder: (context) => const TransactionDetailScreen(
+                            mode: TransactionDetailMode.expense,
+                          ),
                         ),
                       ),
                     ),
@@ -77,7 +88,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const BalanceDetailScreen(),
+                          builder: (context) => const TransactionDetailScreen(
+                            mode: TransactionDetailMode.balance,
+                          ),
                         ),
                       ),
                     ),
@@ -89,7 +102,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const TransactionDetailScreen(isIncome: true),
+                          builder: (context) => const TransactionDetailScreen(
+                            mode: TransactionDetailMode.income,
+                          ),
                         ),
                       ),
                     ),
@@ -129,6 +144,22 @@ class _DashboardScreenState extends State<DashboardScreen>
             ],
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AddTransactionScreen(
+                onSaved: () => Navigator.pop(context),
+              ),
+            ),
+          );
+          if (context.mounted) {
+            context.read<SpendlyProvider>().loadAll();
+          }
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }

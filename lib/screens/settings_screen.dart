@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/money_note_provider.dart';
+import '../providers/spendly_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/currency_helper.dart';
 import 'category_management_screen.dart';
+import 'recurring_transaction_screen.dart';
 
 /// Settings: General (currency, categories), Data (reset, export, import), About.
 class SettingsScreen extends StatelessWidget {
@@ -38,11 +41,22 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
+          ListTile(
+            title: const Text('Manage recurring transaction'),
+            subtitle: const Text('Income and expense templates'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const RecurringTransactionScreen(),
+              ),
+            ),
+          ),
           const Divider(height: 1),
           const _SectionLabel('Data'),
           ListTile(
             title: const Text('Reset data'),
-            subtitle: const Text('Clear all transactions and categories'),
+            subtitle: const Text('Delete all transactions and categories'),
             trailing: const Icon(Icons.delete_outline),
             onTap: () => _confirmReset(context),
           ),
@@ -61,20 +75,57 @@ class SettingsScreen extends StatelessWidget {
           const Divider(height: 1),
           const _SectionLabel('About'),
           const ListTile(
-            title: Text('Money Note'),
+            title: Text('Spendly'),
             subtitle: Text('Track income and expenses. Data stays on your device.'),
           ),
-          ListTile(
-            title: const Text('Version'),
-            subtitle: Text('1.0.0', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ),
+          _VersionTile(onSeedTestData: _confirmSeedTestData),
           const ListTile(
             title: Text('Created by'),
             subtitle: Text('perutkentang.developer'),
           ),
+          ListTile(
+            title: const Text('Support developer'),
+            subtitle: const Text('saweria.co/perutkentang'),
+            trailing: const Icon(Icons.open_in_new, size: 20),
+            onTap: () => _launchSaweria(context),
+          ),
         ],
       ),
     );
+  }
+
+  void _confirmSeedTestData(BuildContext context) {
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const SelectableText('Seed test data?'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SelectableText(
+              'Existing data will be replaced with sample data. Use this to test all features (Dashboard, Report, Recurring, Reminder).',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Seed data'),
+          ),
+        ],
+      ),
+    ).then((ok) async {
+      if (ok == true && context.mounted) {
+        await context.read<SpendlyProvider>().seedTestData();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Test data seeded successfully'), backgroundColor: Colors.green),
+          );
+        }
+      }
+    });
   }
 
   void _confirmReset(BuildContext context) {
@@ -110,7 +161,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ).then((ok) async {
       if (ok == true && context.mounted) {
-        await context.read<MoneyNoteProvider>().resetData();
+        await context.read<SpendlyProvider>().resetData();
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Data reset'), backgroundColor: Colors.green),
@@ -123,13 +174,13 @@ class SettingsScreen extends StatelessWidget {
   Future<void> _exportData(BuildContext context) async {
     try {
       String? dirPath;
-      if (Platform.isAndroid || Platform.isIOS) {
+      if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
         dirPath = await FilePicker.platform.getDirectoryPath(
           dialogTitle: 'Choose folder to save export',
         );
       }
       if (!context.mounted) return;
-      final path = await context.read<MoneyNoteProvider>().exportData(
+      final path = await context.read<SpendlyProvider>().exportData(
         targetDirectoryPath: dirPath,
       );
       if (context.mounted) {
@@ -190,7 +241,7 @@ class SettingsScreen extends StatelessWidget {
         return;
       }
       final path = result.files.single.path!;
-      await context.read<MoneyNoteProvider>().importData(path);
+      await context.read<SpendlyProvider>().importData(path);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Data imported'), backgroundColor: Colors.green),
@@ -202,6 +253,17 @@ class SettingsScreen extends StatelessWidget {
           SnackBar(content: Text('Import failed: $e'), backgroundColor: Colors.red),
         );
       }
+    }
+  }
+
+  static Future<void> _launchSaweria(BuildContext context) async {
+    final uri = Uri.parse('https://saweria.co/perutkentang');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open link')),
+      );
     }
   }
 
@@ -228,6 +290,83 @@ class SettingsScreen extends StatelessWidget {
               );
             }),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Version row: tap 10x to seed test data. Ada animasi klik sebagai feedback.
+class _VersionTile extends StatefulWidget {
+  final void Function(BuildContext context) onSeedTestData;
+
+  const _VersionTile({required this.onSeedTestData});
+
+  @override
+  State<_VersionTile> createState() => _VersionTileState();
+}
+
+class _VersionTileState extends State<_VersionTile>
+    with SingleTickerProviderStateMixin {
+  int _tapCount = 0;
+  Timer? _resetTimer;
+  late AnimationController _animController;
+  late Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnim = Tween<double>(begin: 1, end: 0.92).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _resetTimer?.cancel();
+    _animController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onTap() async {
+    _resetTimer?.cancel();
+    _animController.forward();
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+    _animController.reverse();
+    _tapCount++;
+    if (_tapCount >= 10) {
+      _tapCount = 0;
+      widget.onSeedTestData(context);
+    } else {
+      _resetTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _tapCount = 0);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _onTap,
+        borderRadius: BorderRadius.circular(12),
+        splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+        highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+        child: ScaleTransition(
+          scale: _scaleAnim,
+          child: ListTile(
+            title: const Text('Version'),
+            subtitle: Text(
+              '1.0.0',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ),
         ),
       ),
     );

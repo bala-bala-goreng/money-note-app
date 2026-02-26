@@ -5,12 +5,14 @@ class Category {
   final String name;
   final String iconName; // e.g. 'food', 'shopping' - maps to Icons.xxx
   final bool isIncome; // true = income category, false = expense category
+  final bool isFavorite; // when true, appears first in category lists
 
   const Category({
     this.id,
     required this.name,
     required this.iconName,
     required this.isIncome,
+    this.isFavorite = false,
   });
 
   /// Convert from database row (Map) to Category object
@@ -20,6 +22,7 @@ class Category {
       name: map['name'] as String,
       iconName: map['icon_name'] as String,
       isIncome: (map['is_income'] as int) == 1,
+      isFavorite: (map['is_favorite'] as int?) == 1,
     );
   }
 
@@ -30,15 +33,23 @@ class Category {
       'name': name,
       'icon_name': iconName,
       'is_income': isIncome ? 1 : 0,
+      'is_favorite': isFavorite ? 1 : 0,
     };
   }
 
-  Category copyWith({int? id, String? name, String? iconName, bool? isIncome}) {
+  Category copyWith({
+    int? id,
+    String? name,
+    String? iconName,
+    bool? isIncome,
+    bool? isFavorite,
+  }) {
     return Category(
       id: id ?? this.id,
       name: name ?? this.name,
       iconName: iconName ?? this.iconName,
       isIncome: isIncome ?? this.isIncome,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 }

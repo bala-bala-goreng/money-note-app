@@ -2,10 +2,11 @@ import 'package:flutter/foundation.dart';
 import '../database/database_helper.dart';
 import '../models/category.dart' as models;
 import '../models/transaction.dart';
+import '../models/recurring_transaction.dart';
 
 /// Provider that holds app state and talks to the database.
 /// When data changes, we call notifyListeners() so the UI rebuilds.
-class MoneyNoteProvider extends ChangeNotifier {
+class SpendlyProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
 
   List<TransactionRecord> _transactions = [];
@@ -73,6 +74,59 @@ class MoneyNoteProvider extends ChangeNotifier {
     await _db.resetData();
     await loadAll();
   }
+
+  Future<void> seedTestData() async {
+    await _db.seedTestData();
+    await loadAll();
+  }
+
+  Future<List<RecurringTransaction>> getRecurringTransactions({
+    bool? isIncome,
+  }) =>
+      _db.getRecurringTransactions(isIncome: isIncome);
+
+  Future<void> addRecurring(RecurringTransaction r) async {
+    await _db.insertRecurring(r);
+    await loadAll();
+  }
+
+  Future<void> updateRecurring(RecurringTransaction r) async {
+    await _db.updateRecurring(r);
+    await loadAll();
+  }
+
+  Future<void> deleteRecurring(int id) async {
+    await _db.deleteRecurring(id);
+    await loadAll();
+  }
+
+  /// Recurring transactions with reminders that are due (in window + not yet added this month).
+  Future<List<RecurringTransaction>> getDueRecurringReminders() async {
+    final all = await _db.getRecurringTransactions();
+    final now = DateTime.now();
+    final due = <RecurringTransaction>[];
+    for (final r in all) {
+      if (!r.isReminderEnabled) continue;
+      if (!RecurringTransaction.isInReminderWindow(r.reminderType, now)) {
+        continue;
+      }
+      final hasTx = await _db.hasTransactionThisMonth(r.categoryId, r.isIncome);
+      if (!hasTx) due.add(r);
+    }
+    return due;
+  }
+
+  Future<Map<String, ({double income, double expense})>> getDailyTotals(
+    DateTime start,
+    DateTime end,
+  ) =>
+      _db.getDailyTotals(start, end);
+
+  Future<({Map<int, double> expense, Map<int, double> income})> getCategoryTotalsForRange(
+    DateTime start,
+    DateTime end,
+  ) =>
+      _db.getCategoryTotalsForRange(start, end);
 
   Future<String> exportData({String? targetDirectoryPath}) async =>
       _db.exportData(targetDirectoryPath: targetDirectoryPath);

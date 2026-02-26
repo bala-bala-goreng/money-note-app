@@ -3,26 +3,53 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart' as m;
-import '../providers/money_note_provider.dart';
+import '../providers/spendly_provider.dart';
 import '../utils/category_icons.dart';
 import '../utils/decimal_input_formatter.dart';
 import '../widgets/transaction_list_item.dart';
 
-/// Detail list for expenses or income with filters: date range, category, description.
-class TransactionDetailScreen extends StatefulWidget {
-  final bool isIncome;
+/// Mode: expense only, income only, atau balance (keduanya).
+enum TransactionDetailMode {
+  expense,
+  income,
+  balance,
+}
 
-  const TransactionDetailScreen({super.key, required this.isIncome});
+/// Satu screen untuk semua: Expense box, Balance box, Income box, dan Calendar.
+/// - Dari box: filter by mode (expense/income/balance), all dates, bisa ubah date + category + search
+/// - Dari calendar: sama tapi initialDate = tanggal yang dipilih (filter hanya hari itu)
+class TransactionDetailScreen extends StatefulWidget {
+  final TransactionDetailMode mode;
+  /// Dari calendar: filter hanya tanggal ini. Null = all dates.
+  final DateTime? initialDate;
+
+  const TransactionDetailScreen({
+    super.key,
+    required this.mode,
+    this.initialDate,
+  });
 
   @override
   State<TransactionDetailScreen> createState() => _TransactionDetailScreenState();
 }
 
 class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
-  DateTime? _fromDate;
-  DateTime? _toDate;
-  int? _categoryId; // null = all
+  late DateTime? _fromDate;
+  late DateTime? _toDate;
+  Set<int> _selectedCategoryIds = const {}; // empty = All
   final _descriptionController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialDate != null) {
+      _fromDate = DateTime(widget.initialDate!.year, widget.initialDate!.month, widget.initialDate!.day);
+      _toDate = DateTime(widget.initialDate!.year, widget.initialDate!.month, widget.initialDate!.day);
+    } else {
+      _fromDate = null;
+      _toDate = null;
+    }
+  }
 
   @override
   void dispose() {
@@ -32,20 +59,29 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
 
   List<TransactionRecord> _applyFilters(
     List<TransactionRecord> list,
-    m.Category? Function(int) getCategoryById,
   ) {
-    var result = list.where((t) => t.isIncome == widget.isIncome).toList();
+    var result = list;
+    switch (widget.mode) {
+      case TransactionDetailMode.expense:
+        result = result.where((t) => !t.isIncome).toList();
+        break;
+      case TransactionDetailMode.income:
+        result = result.where((t) => t.isIncome).toList();
+        break;
+      case TransactionDetailMode.balance:
+        break; // both
+    }
 
     if (_fromDate != null) {
       final start = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
-      result = result.where((t) => t.transactionDate.isAfter(start) || t.transactionDate.isAtSameMomentAs(start)).toList();
+      result = result.where((t) => !t.transactionDate.isBefore(start)).toList();
     }
     if (_toDate != null) {
       final end = DateTime(_toDate!.year, _toDate!.month, _toDate!.day, 23, 59, 59);
-      result = result.where((t) => t.transactionDate.isBefore(end) || t.transactionDate.isAtSameMomentAs(end)).toList();
+      result = result.where((t) => !t.transactionDate.isAfter(end)).toList();
     }
-    if (_categoryId != null) {
-      result = result.where((t) => t.categoryId == _categoryId).toList();
+    if (_selectedCategoryIds.isNotEmpty) {
+      result = result.where((t) => _selectedCategoryIds.contains(t.categoryId)).toList();
     }
     final desc = _descriptionController.text.trim().toLowerCase();
     if (desc.isNotEmpty) {
@@ -60,12 +96,25 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     return result;
   }
 
+  List<m.Category> _categoriesForFilter(SpendlyProvider provider) {
+    switch (widget.mode) {
+      case TransactionDetailMode.expense:
+        return provider.categories.where((c) => !c.isIncome).toList();
+      case TransactionDetailMode.income:
+        return provider.categories.where((c) => c.isIncome).toList();
+      case TransactionDetailMode.balance:
+        return provider.categories;
+    }
+  }
+
   void _showEditSheet(
     BuildContext context,
     TransactionRecord t,
-    List<m.Category> categories,
-    MoneyNoteProvider provider,
+    SpendlyProvider provider,
   ) {
+    final categories = provider.categories
+        .where((c) => c.isIncome == t.isIncome)
+        .toList();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -77,23 +126,31 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     );
   }
 
+  String get _title {
+    switch (widget.mode) {
+      case TransactionDetailMode.expense:
+        return 'Expenses';
+      case TransactionDetailMode.income:
+        return 'Income';
+      case TransactionDetailMode.balance:
+        return 'Balance';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final title = widget.isIncome ? 'Income' : 'Expenses';
     final dateFormat = DateFormat('d MMM y');
+    final categoriesForFilter = _categoriesForFilter;
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Consumer<MoneyNoteProvider>(
+      appBar: AppBar(title: Text(_title)),
+      body: Consumer<SpendlyProvider>(
         builder: (context, provider, _) {
-          final categories = provider.categories
-              .where((c) => c.isIncome == widget.isIncome)
-              .toList();
-          final filtered = _applyFilters(provider.transactions, provider.getCategoryById);
+          final categories = categoriesForFilter(provider);
+          final filtered = _applyFilters(provider.transactions);
 
           return Column(
             children: [
-              // Filters
               Material(
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 child: Padding(
@@ -137,21 +194,10 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      DropdownButtonFormField<int?>(
-                        value: _categoryId,
-                        decoration: const InputDecoration(
-                          labelText: 'Category',
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                        items: [
-                          const DropdownMenuItem(value: null, child: Text('All')),
-                          ...categories.map((c) => DropdownMenuItem<int?>(
-                                value: c.id,
-                                child: Text(c.name),
-                              )),
-                        ],
-                        onChanged: (v) => setState(() => _categoryId = v),
+                      _CategoryMultiComboBox(
+                        selectedIds: _selectedCategoryIds,
+                        categories: categories.where((c) => c.id != null).toList(),
+                        onChanged: (ids) => setState(() => _selectedCategoryIds = ids),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -168,7 +214,6 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   ),
                 ),
               ),
-              // List
               Expanded(
                 child: filtered.isEmpty
                     ? Center(
@@ -189,7 +234,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                           final t = filtered[i];
                           final cat = provider.getCategoryById(t.categoryId);
                           return InkWell(
-                            onTap: () => _showEditSheet(context, t, categories, provider),
+                            onTap: () => _showEditSheet(context, t, provider),
                             child: TransactionListItem(transaction: t, category: cat),
                           );
                         },
@@ -203,14 +248,201 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   }
 }
 
-/// Bottom sheet content for editing a transaction (description, amount, category).
-/// Public so [BalanceDetailScreen] can reuse it.
+/// Combo box multi-select untuk filter kategori.
+class _CategoryMultiComboBox extends StatefulWidget {
+  final Set<int> selectedIds;
+  final List<m.Category> categories;
+  final ValueChanged<Set<int>> onChanged;
+
+  const _CategoryMultiComboBox({
+    super.key,
+    required this.selectedIds,
+    required this.categories,
+    required this.onChanged,
+  });
+
+  @override
+  State<_CategoryMultiComboBox> createState() => _CategoryMultiComboBoxState();
+}
+
+class _CategoryMultiComboBoxState extends State<_CategoryMultiComboBox> {
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  List<m.Category> get _filtered {
+    if (_query.trim().isEmpty) return widget.categories;
+    final q = _query.trim().toLowerCase();
+    return widget.categories.where((c) => c.name.toLowerCase().contains(q)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.categories.where((c) => widget.selectedIds.contains(c.id)).toList();
+    final isEmpty = widget.selectedIds.isEmpty;
+
+    return InkWell(
+      onTap: () => _showPicker(context),
+      borderRadius: BorderRadius.circular(4),
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'Category',
+          hintText: 'Select categories...',
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          suffixIcon: Icon(Icons.arrow_drop_down, size: 24),
+        ),
+        child: isEmpty
+            ? const Text('All', style: TextStyle(color: Colors.grey))
+            : Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: selected
+                    .map((c) => Chip(
+                          label: Text(c.name, style: const TextStyle(fontSize: 12)),
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          onDeleted: () {
+                            widget.onChanged({...widget.selectedIds}..remove(c.id));
+                          },
+                        ))
+                    .toList(),
+              ),
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    _searchController.clear();
+    setState(() => _query = '');
+    Set<int> pending = Set.from(widget.selectedIds);
+    final categories = widget.categories;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final filtered = _query.trim().isEmpty
+                ? categories
+                : categories.where((c) => c.name.toLowerCase().contains(_query.trim().toLowerCase())).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.5,
+              minChildSize: 0.3,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (_, scrollController) {
+                return Padding(
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                focusNode: _searchFocus,
+                                decoration: const InputDecoration(
+                                  hintText: 'Search category...',
+                                  isDense: true,
+                                  prefixIcon: Icon(Icons.search, size: 20),
+                                ),
+                                onChanged: (v) => setModalState(() => _query = v),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                pending = {};
+                                setModalState(() {});
+                              },
+                              child: const Text('Clear'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Flexible(
+                        child: ListView(
+                          controller: scrollController,
+                          shrinkWrap: true,
+                          children: [
+                            ListTile(
+                              leading: Icon(
+                                pending.isEmpty ? Icons.check_box : Icons.check_box_outline_blank,
+                                color: Theme.of(ctx).colorScheme.primary,
+                              ),
+                              title: const Text('All'),
+                              onTap: () {
+                                pending = {};
+                                setModalState(() {});
+                              },
+                            ),
+                            ...filtered.map((c) {
+                              final id = c.id!;
+                              final checked = pending.contains(id);
+                              return CheckboxListTile(
+                                value: checked,
+                                title: Text(c.name),
+                                onChanged: (_) {
+                                  if (checked) {
+                                    pending = {...pending}..remove(id);
+                                  } else {
+                                    pending = {...pending, id};
+                                  }
+                                  setModalState(() {});
+                                },
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () {
+                              widget.onChanged(pending);
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('Apply'),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      _searchController.clear();
+      setState(() => _query = '');
+    });
+  }
+}
+
+/// Bottom sheet untuk edit transaksi.
 class EditTransactionSheet extends StatefulWidget {
   final TransactionRecord transaction;
   final List<m.Category> categories;
-  final MoneyNoteProvider provider;
+  final SpendlyProvider provider;
 
   const EditTransactionSheet({
+    super.key,
     required this.transaction,
     required this.categories,
     required this.provider,

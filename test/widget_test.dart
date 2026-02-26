@@ -4,19 +4,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:money_note_app/providers/money_note_provider.dart';
-import 'package:money_note_app/widgets/summary_box.dart';
+import 'package:spendly/providers/spendly_provider.dart';
+import 'package:spendly/widgets/summary_box.dart';
 
 void main() {
   testWidgets('App loads and shows dashboard title', (WidgetTester tester) async {
     await tester.pumpWidget(
       ChangeNotifierProvider(
-        create: (_) => MoneyNoteProvider(),
+        create: (_) => SpendlyProvider(),
         child: MaterialApp(
           home: Builder(
             builder: (context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Money Note')),
+                appBar: AppBar(title: const Text('Spendly')),
                 body: const Text('Dashboard'),
               );
             },
@@ -25,7 +25,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Money Note'), findsOneWidget);
+    expect(find.text('Spendly'), findsOneWidget);
     expect(find.text('Dashboard'), findsOneWidget);
   });
 

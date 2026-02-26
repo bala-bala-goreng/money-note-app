@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/money_note_provider.dart';
+import '../providers/spendly_provider.dart';
 import '../models/category.dart';
 import '../utils/category_icons.dart';
 
@@ -14,19 +14,30 @@ class CategoryManagementScreen extends StatefulWidget {
       _CategoryManagementScreenState();
 }
 
-class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
+class _CategoryManagementScreenState extends State<CategoryManagementScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MoneyNoteProvider>().loadAll();
+      context.read<SpendlyProvider>().loadAll();
     });
   }
 
-  void _showCategoryDialog({Category? existing}) {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _showCategoryDialog({Category? existing, bool? defaultIsIncome}) {
     final nameController = TextEditingController(text: existing?.name ?? '');
     String iconName = existing?.iconName ?? 'category';
-    bool isIncome = existing?.isIncome ?? true;
+    bool isIncome = existing?.isIncome ?? defaultIsIncome ?? true;
+    bool isFavorite = existing?.isFavorite ?? false;
 
     showDialog(
       context: context,
@@ -51,6 +62,19 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                   selected: {isIncome},
                   onSelectionChanged: (s) =>
                       setState(() => isIncome = s.first),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: isFavorite,
+                      onChanged: (v) => setState(() => isFavorite = v ?? false),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => isFavorite = !isFavorite),
+                      child: const Text('Favorite (show first in lists)'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 const Text('Icon', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -92,8 +116,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                   name: name.trim(),
                   iconName: iconName,
                   isIncome: isIncome,
+                  isFavorite: isFavorite,
                 );
-                final provider = context.read<MoneyNoteProvider>();
+                final provider = context.read<SpendlyProvider>();
                 if (existing == null) {
                   await provider.addCategory(cat);
                 } else {
@@ -109,38 +134,102 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
   }
 
+  List<Category> _filteredCategories(List<Category> all, bool isIncome) {
+    return all.where((c) => c.isIncome == isIncome).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Manage Categories')),
-      body: Consumer<MoneyNoteProvider>(
+      appBar: AppBar(
+        title: const Text('Manage Categories'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Income'),
+            Tab(text: 'Expense'),
+          ],
+        ),
+      ),
+      body: Consumer<SpendlyProvider>(
         builder: (context, provider, _) {
           final categories = provider.categories;
-          if (categories.isEmpty) {
-            return const Center(child: Text('No categories yet. Tap + to add.'));
-          }
-
-          return ListView.builder(
-            itemCount: categories.length,
-            itemBuilder: (context, i) {
-              final c = categories[i];
-              return ListTile(
-                leading: CircleAvatar(
-                  child: Icon(getIconData(c.iconName)),
-                ),
-                title: Text(c.name),
-                subtitle: Text(c.isIncome ? 'Income' : 'Expense'),
-                trailing: const Icon(Icons.edit),
-                onTap: () => _showCategoryDialog(existing: c),
-              );
-            },
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildCategoryList(
+                _filteredCategories(categories, true),
+                onAdd: () => _showCategoryDialog(defaultIsIncome: true),
+              ),
+              _buildCategoryList(
+                _filteredCategories(categories, false),
+                onAdd: () => _showCategoryDialog(defaultIsIncome: false),
+              ),
+            ],
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCategoryDialog(),
+        onPressed: () => _showCategoryDialog(
+          defaultIsIncome: _tabController.index == 0,
+        ),
         child: const Icon(Icons.add),
       ),
+    );
+  }
+
+  Widget _buildCategoryList(List<Category> categories, {VoidCallback? onAdd}) {
+    if (categories.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'No ${_tabController.index == 0 ? 'income' : 'expense'} categories yet.',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add),
+              label: const Text('Add'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: categories.length,
+      itemBuilder: (context, i) {
+        final c = categories[i];
+        return ListTile(
+          leading: CircleAvatar(
+            child: Icon(getIconData(c.iconName)),
+          ),
+          title: Text(c.name),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(
+                  c.isFavorite ? Icons.star : Icons.star_border,
+                  color: c.isFavorite
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                onPressed: () async {
+                  await context.read<SpendlyProvider>().updateCategory(
+                        c.copyWith(isFavorite: !c.isFavorite),
+                      );
+                },
+              ),
+              const Icon(Icons.edit),
+            ],
+          ),
+          onTap: () => _showCategoryDialog(existing: c),
+        );
+      },
     );
   }
 }

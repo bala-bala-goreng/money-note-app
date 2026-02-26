@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../providers/money_note_provider.dart';
+import '../providers/settings_provider.dart';
+import '../providers/spendly_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart' as m;
+import '../models/recurring_transaction.dart';
 import '../utils/category_icons.dart';
 import '../utils/decimal_input_formatter.dart';
 
@@ -26,25 +28,27 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
   List<m.Category> _categories = [];
+  List<RecurringTransaction> _recurring = [];
   static final _dateFormat = DateFormat('d MMM y');
 
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    _loadData();
   }
 
-  Future<void> _loadCategories() async {
-    final provider = context.read<MoneyNoteProvider>();
+  Future<void> _loadData() async {
+    final provider = context.read<SpendlyProvider>();
     await provider.loadAll();
-    if (mounted) {
-      setState(() {
-        _categories = provider.categories
-            .where((c) => c.isIncome == _isIncome)
-            .toList();
-        _selectedCategory = _categories.isNotEmpty ? _categories.first : null;
-      });
-    }
+    if (!mounted) return;
+    final recurring = await provider.getRecurringTransactions(isIncome: _isIncome);
+    setState(() {
+      _categories = provider.categories
+          .where((c) => c.isIncome == _isIncome)
+          .toList();
+      _selectedCategory = _categories.isNotEmpty ? _categories.first : null;
+      _recurring = recurring;
+    });
   }
 
   @override
@@ -54,25 +58,33 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.dispose();
   }
 
-  void _onTypeChanged(bool isIncome) {
+  void _onTypeChanged(bool isIncome) async {
+    setState(() => _isIncome = isIncome);
+    final provider = context.read<SpendlyProvider>();
+    _categories = provider.categories
+        .where((c) => c.isIncome == isIncome)
+        .toList();
+    _selectedCategory = _categories.isNotEmpty ? _categories.first : null;
+    final recurring = await provider.getRecurringTransactions(isIncome: isIncome);
+    if (mounted) {
+      setState(() {
+        _recurring = recurring;
+      });
+    }
+  }
+
+  void _applyRecurring(RecurringTransaction r) {
+    final cat = _categories.where((c) => c.id == r.categoryId).firstOrNull;
     setState(() {
-      _isIncome = isIncome;
-      _categories = context.read<MoneyNoteProvider>().categories
-          .where((c) => c.isIncome == isIncome)
-          .toList();
-      _selectedCategory = _categories.isNotEmpty ? _categories.first : null;
+      _descriptionController.text = r.description;
+      _amountController.text = r.amount.toStringAsFixed(2);
+      if (cat != null) _selectedCategory = cat;
     });
   }
 
   Future<void> _save() async {
     final desc = _descriptionController.text.trim();
     final amountStr = _amountController.text.trim();
-    if (desc.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Description is required')),
-      );
-      return;
-    }
     if (amountStr.isEmpty || _selectedCategory == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields')),
@@ -89,7 +101,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     final transactionDate = DateTime(_date.year, _date.month, _date.day);
     final t = TransactionRecord(
-      description: desc,
+      description: desc.trim(),
       amount: amount,
       categoryId: _selectedCategory!.id!,
       transactionDate: transactionDate,
@@ -97,7 +109,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       isIncome: _isIncome,
     );
 
-    await context.read<MoneyNoteProvider>().addTransaction(t);
+    await context.read<SpendlyProvider>().addTransaction(t);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Transaction added'), backgroundColor: Colors.green),
@@ -161,11 +173,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Description (required)
+            // Description (optional)
             TextField(
               controller: _descriptionController,
               decoration: const InputDecoration(
-                labelText: 'Description *',
+                labelText: 'Description (optional)',
                 hintText: 'e.g. Lunch at cafe',
               ),
               textCapitalization: TextCapitalization.sentences,
@@ -188,6 +200,37 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               onPressed: _save,
               child: const Text('Save'),
             ),
+            const SizedBox(height: 32),
+
+            // Quick fill (di bawah tombol Save, ListView ke bawah)
+            if (_recurring.isNotEmpty) ...[
+              Text(
+                'Quick fill',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 180,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _recurring.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    final r = _recurring[i];
+                    final cat = context.read<SpendlyProvider>().getCategoryById(r.categoryId);
+                    return ListTile(
+                      leading: Icon(
+                        getIconData(cat?.iconName ?? 'category'),
+                        color: _isIncome ? Colors.green : Colors.red,
+                      ),
+                      title: Text(r.description),
+                      subtitle: Text(context.read<SettingsProvider>().formatAmount(r.amount)),
+                      onTap: () => _applyRecurring(r),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),

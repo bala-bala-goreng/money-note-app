@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
+import '../utils/category_colors.dart';
 import '../utils/category_icons.dart';
 import '../providers/settings_provider.dart';
 
@@ -22,15 +23,16 @@ class TransactionListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final amountColor = transaction.isIncome ? Colors.green : Colors.red;
+    final iconColor = categoryColorByIconName(category?.iconName);
     final formattedAmount = context.read<SettingsProvider>().formatAmount(transaction.amount);
     final dateStr = DateFormat('d MMM y').format(transaction.transactionDate);
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: amountColor.withValues(alpha: 0.2),
+        backgroundColor: iconColor.withValues(alpha: 0.2),
         child: Icon(
           category != null ? getIconData(category!.iconName) : Icons.receipt,
-          color: amountColor,
+          color: iconColor,
         ),
       ),
       title: Text(

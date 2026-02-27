@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/spendly_provider.dart';
 import '../utils/category_icons.dart';
+import '../utils/category_colors.dart';
 import '../utils/currency_helper.dart';
 import '../widgets/summary_box.dart';
 import 'transaction_detail_screen.dart';
@@ -71,26 +72,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _dailyTotals.values.fold(0.0, (sum, t) => sum + t.expense);
   double get _monthlyBalance => _monthlyIncome - _monthlyExpense;
 
-  static const _expenseColors = [
-    Color(0xFFE53935),
-    Color(0xFFD32F2F),
-    Color(0xFFC62828),
-    Color(0xFFEF5350),
-    Color(0xFFE57373),
-    Color(0xFFFF8A65),
-    Color(0xFFFF7043),
-    Color(0xFFF4511E),
-  ];
-  static const _incomeColors = [
-    Color(0xFF43A047),
-    Color(0xFF388E3C),
-    Color(0xFF2E7D32),
-    Color(0xFF66BB6A),
-    Color(0xFF81C784),
-    Color(0xFF26A69A),
-    Color(0xFF00897B),
-    Color(0xFF00796B),
-  ];
+  Color _categoryColor(String? iconName) => categoryColorByIconName(iconName);
 
   @override
   Widget build(BuildContext context) {
@@ -230,13 +212,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: Colors.red,
                   entries: expEntries
                       .map((e) => (
+                            iconName: provider.getCategoryById(e.key)?.iconName,
                             name: provider.getCategoryById(e.key)?.name ?? 'Unknown',
                             value: e.value,
                             icon: getIconData(
                                 provider.getCategoryById(e.key)?.iconName ?? 'category'),
                           ))
                       .toList(),
-                  colors: _expenseColors,
+                  colorForId: _categoryColor,
                 ),
                 const SizedBox(height: 24),
               ],
@@ -247,13 +230,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: Colors.green,
                   entries: incEntries
                       .map((e) => (
+                            iconName: provider.getCategoryById(e.key)?.iconName,
                             name: provider.getCategoryById(e.key)?.name ?? 'Unknown',
                             value: e.value,
                             icon: getIconData(
                                 provider.getCategoryById(e.key)?.iconName ?? 'category'),
                           ))
                       .toList(),
-                  colors: _incomeColors,
+                  colorForId: _categoryColor,
                 ),
               ],
             ],
@@ -388,15 +372,15 @@ class _PieChartCard extends StatelessWidget {
   final String title;
   final double total;
   final Color color;
-  final List<({String name, double value, IconData icon})> entries;
-  final List<Color> colors;
+  final List<({String? iconName, String name, double value, IconData icon})> entries;
+  final Color Function(String? iconName) colorForId;
 
   const _PieChartCard({
     required this.title,
     required this.total,
     required this.color,
     required this.entries,
-    required this.colors,
+    required this.colorForId,
   });
 
   @override
@@ -411,7 +395,7 @@ class _PieChartCard extends StatelessWidget {
         PieChartSectionData(
           value: e.value,
           title: pct >= 5 ? '${pct.toStringAsFixed(0)}%' : '',
-          color: colors[i % colors.length],
+          color: colorForId(e.iconName),
           radius: 60,
           titleStyle: const TextStyle(
             fontSize: 12,
@@ -478,33 +462,35 @@ class _PieChartCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: entries.asMap().entries.map((e) {
-                      final i = e.key;
-                      final item = e.value;
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: entries.map((item) {
                       final pct = total > 0 ? (item.value / total * 100) : 0.0;
-                      return Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: colors[i % colors.length],
-                              shape: BoxShape.circle,
+                      final sliceColor = colorForId(item.iconName);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: sliceColor.withValues(alpha: 0.2),
+                              child: Icon(item.icon, size: 16, color: sliceColor),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              '${item.name} (${pct.toStringAsFixed(1)}%)',
-                              style: const TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                item.name,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Text(
+                              '${pct.toStringAsFixed(1)}%',
+                              style: TextStyle(fontSize: 12, color: sliceColor, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
                       );
                     }).toList(),
                   ),

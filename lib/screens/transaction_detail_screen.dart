@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart' as m;
 import '../providers/spendly_provider.dart';
+import 'add_transaction_screen.dart';
 import '../utils/category_icons.dart';
 import '../utils/decimal_input_formatter.dart';
 import '../widgets/transaction_list_item.dart';
@@ -137,6 +138,18 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     }
   }
 
+  DateTime? get _defaultAddDate {
+    if (_fromDate == null && _toDate == null) return null;
+    if (_fromDate != null &&
+        _toDate != null &&
+        _fromDate!.year == _toDate!.year &&
+        _fromDate!.month == _toDate!.month &&
+        _fromDate!.day == _toDate!.day) {
+      return _fromDate;
+    }
+    return _fromDate ?? _toDate;
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('d MMM y');
@@ -144,6 +157,23 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(_title)),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AddTransactionScreen(
+                initialDate: _defaultAddDate,
+                onSaved: () => Navigator.pop(context),
+              ),
+            ),
+          );
+          if (!mounted) return;
+          context.read<SpendlyProvider>().loadAll();
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Add'),
+      ),
       body: Consumer<SpendlyProvider>(
         builder: (context, provider, _) {
           final categories = categoriesForFilter(provider);
@@ -255,7 +285,6 @@ class _CategoryMultiComboBox extends StatefulWidget {
   final ValueChanged<Set<int>> onChanged;
 
   const _CategoryMultiComboBox({
-    super.key,
     required this.selectedIds,
     required this.categories,
     required this.onChanged,
@@ -275,12 +304,6 @@ class _CategoryMultiComboBoxState extends State<_CategoryMultiComboBox> {
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
-  }
-
-  List<m.Category> get _filtered {
-    if (_query.trim().isEmpty) return widget.categories;
-    final q = _query.trim().toLowerCase();
-    return widget.categories.where((c) => c.name.toLowerCase().contains(q)).toList();
   }
 
   @override

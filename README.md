@@ -1,11 +1,14 @@
 # Spendly
 
-A simple app to track your income and expenses. Everything is stored on your device (SQLite). No account, no cloud—just you and your numbers.
+Track income and expenses locally. Everything stays on your device (SQLite). No account, no cloud—just you and your numbers.
 
-**What it does:**
-- **Dashboard** – Three summary boxes (total expenses, balance, total income). Tap balance for a breakdown. Two tabs: expense list and income list. Tap a transaction to view or delete it.
-- **Add** – Create income or expense with category, description, and amount.
-- **Settings** – Choose currency, manage categories (add, edit, pick an icon), reset data, or export/import a backup. Expenses use red, income uses green.
+## Features
+
+- **Dashboard** – Summary boxes (Expenses, Balance, Income). Tap any box for filtered transaction list. Tabs: Expenses / Income lists. FAB to add transaction.
+- **Report** – Calendar view of daily totals; switch to pie chart by category (expense and income). Tap a date for day detail.
+- **Add transaction** – Category, description, amount, date. Quick-fill from recurring templates.
+- **Recurring transactions** – Templates with optional reminders (start/end of month).
+- **Settings** – Currency (IDR, USD, EUR), category management, reset, export/import backup, support link.
 
 ---
 
@@ -45,7 +48,8 @@ spendly/
 │   ├── screens/
 │   │   ├── home_shell.dart           → Bottom nav: Dashboard, Add, Settings
 │   │   ├── dashboard_screen.dart     → 3 summary boxes + expense/income tabs + lists
-│   │   ├── transaction_detail_screen.dart → Expense/Balance/Income/Calendar: filter by date, category, search
+│   │   ├── calendar_screen.dart           → Report: calendar + pie chart by category
+│   │   ├── transaction_detail_screen.dart → Expense/Balance/Income: filter by date, category, search
 │   │   ├── add_transaction_screen.dart    → Form to add income/expense
 │   │   ├── category_management_screen.dart → List and add/edit categories
 │   │   └── settings_screen.dart      → Currency, categories, reset, export/import, about
@@ -65,12 +69,14 @@ spendly/
 └── pubspec.yaml   → Dependencies (see below)
 ```
 
-**Dependencies (from pubspec):**
-- `sqflite` + `path` – local SQLite database
-- `provider` – state management so the UI updates when data changes
-- `intl` – formatting money and dates
-- `shared_preferences` – persist currency and other settings
-- `path_provider` + `file_picker` + `permission_handler` – export/import backup files
+**Dependencies:**
+- `sqflite` + `path` – SQLite database
+- `provider` – state management
+- `intl` – money and date formatting
+- `shared_preferences` – currency and preferences
+- `path_provider` + `file_picker` + `permission_handler` – export/import
+- `url_launcher` – open support link
+- `fl_chart` – pie charts in Report
 
 ---
 

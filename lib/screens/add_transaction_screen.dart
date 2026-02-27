@@ -6,6 +6,7 @@ import '../providers/spendly_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart' as m;
 import '../models/recurring_transaction.dart';
+import '../utils/category_colors.dart';
 import '../utils/category_icons.dart';
 import '../utils/decimal_input_formatter.dart';
 
@@ -14,8 +15,10 @@ import '../utils/decimal_input_formatter.dart';
 class AddTransactionScreen extends StatefulWidget {
   /// Called after a transaction is saved successfully (e.g. switch to Home tab).
   final VoidCallback? onSaved;
+  /// Optional initial transaction date (used when adding from calendar detail).
+  final DateTime? initialDate;
 
-  const AddTransactionScreen({super.key, this.onSaved});
+  const AddTransactionScreen({super.key, this.onSaved, this.initialDate});
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
@@ -34,6 +37,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialDate != null) {
+      _date = DateTime(
+        widget.initialDate!.year,
+        widget.initialDate!.month,
+        widget.initialDate!.day,
+      );
+    }
     _loadData();
   }
 
@@ -146,7 +156,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         value: c,
                         child: Row(
                           children: [
-                            Icon(getIconData(c.iconName), size: 20),
+                            Icon(
+                              getIconData(c.iconName),
+                              size: 20,
+                              color: categoryColorByIconName(c.iconName),
+                            ),
                             const SizedBox(width: 8),
                             Text(c.name),
                           ],
@@ -221,7 +235,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     return ListTile(
                       leading: Icon(
                         getIconData(cat?.iconName ?? 'category'),
-                        color: _isIncome ? Colors.green : Colors.red,
+                        color: categoryColorByIconName(cat?.iconName),
                       ),
                       title: Text(r.description),
                       subtitle: Text(context.read<SettingsProvider>().formatAmount(r.amount)),

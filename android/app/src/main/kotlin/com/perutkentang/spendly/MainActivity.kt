@@ -1,4 +1,4 @@
-package com.example.spendly
+package com.perutkentang.spendly
 
 import io.flutter.embedding.android.FlutterActivity
 

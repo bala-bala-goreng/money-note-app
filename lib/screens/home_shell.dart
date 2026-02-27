@@ -6,6 +6,7 @@ import 'settings_screen.dart';
 import 'add_transaction_screen.dart';
 import '../providers/spendly_provider.dart';
 import '../models/recurring_transaction.dart';
+import '../utils/category_colors.dart';
 import '../utils/category_icons.dart';
 import '../utils/currency_helper.dart';
 
@@ -68,7 +69,7 @@ class _HomeShellState extends State<HomeShell> {
                     Icon(
                       getIconData(cat?.iconName ?? 'category'),
                       size: 24,
-                      color: r.isIncome ? Colors.green : Colors.red,
+                      color: categoryColorByIconName(cat?.iconName),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

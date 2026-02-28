@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
@@ -23,22 +24,31 @@ class DatabaseHelper {
 
   DatabaseHelper._init();
 
-  static const String _dbFileName = 'spendly.db';
+  static const String primaryDbFileName = 'spendly.db';
+  static const String testDbFileName = 'spendly_test.db';
+  static const String _activeDbPrefKey = 'active_db_file_name';
+  String _activeDbFileName = primaryDbFileName;
+  bool _activeDbLoaded = false;
 
   /// Increment this when you add schema changes. Migrations run from old to this.
   static const int dbVersion = 7;
 
   Future<Database> get database async {
+    await _ensureActiveDbLoaded();
     if (_database != null) return _database!;
-    _database = await _initDB(_dbFileName);
+    _database = await _initDB(_activeDbFileName);
     return _database!;
   }
 
   /// Path to the SQLite database file.
   Future<String> get databasePath async {
+    await _ensureActiveDbLoaded();
     final dir = await getDatabasesPath();
-    return join(dir, _dbFileName);
+    return join(dir, _activeDbFileName);
   }
+
+  String get activeDbFileName => _activeDbFileName;
+  bool get isUsingTestDatabase => _activeDbFileName == testDbFileName;
 
   /// Close the database (e.g. before import). Next access will reopen.
   Future<void> close() async {
@@ -46,6 +56,34 @@ class DatabaseHelper {
       await _database!.close();
       _database = null;
     }
+  }
+
+  Future<void> _ensureActiveDbLoaded() async {
+    if (_activeDbLoaded) return;
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_activeDbPrefKey);
+    if (saved == testDbFileName || saved == primaryDbFileName) {
+      _activeDbFileName = saved!;
+    }
+    _activeDbLoaded = true;
+  }
+
+  /// Switch current active DB file. Existing connection is closed and reopened lazily.
+  Future<void> setUseTestDatabase(bool useTest) async {
+    await _ensureActiveDbLoaded();
+    final next = useTest ? testDbFileName : primaryDbFileName;
+    if (_activeDbFileName == next) return;
+    await close();
+    _activeDbFileName = next;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_activeDbPrefKey, _activeDbFileName);
+  }
+
+  /// Toggle active DB file between primary and test DB.
+  /// Returns true if the active DB is now test DB.
+  Future<bool> toggleDatabaseFile() async {
+    await setUseTestDatabase(!isUsingTestDatabase);
+    return isUsingTestDatabase;
   }
 
   Future<Database> _initDB(String filePath) async {

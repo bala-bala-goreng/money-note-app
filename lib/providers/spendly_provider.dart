@@ -19,6 +19,8 @@ class SpendlyProvider extends ChangeNotifier {
   double get totalIncome => _totalIncome;
   double get totalExpense => _totalExpense;
   double get balance => _totalIncome - _totalExpense;
+  bool get isUsingTestDatabase => _db.isUsingTestDatabase;
+  String get activeDatabaseFileName => _db.activeDbFileName;
 
   /// Load all data from database - call on app start and after changes
   Future<void> loadAll() async {
@@ -145,5 +147,11 @@ class SpendlyProvider extends ChangeNotifier {
   Future<void> importData(String path) async {
     await _db.importData(path);
     await loadAll();
+  }
+
+  Future<bool> toggleActiveDatabase() async {
+    final usingTest = await _db.toggleDatabaseFile();
+    await loadAll();
+    return usingTest;
   }
 }

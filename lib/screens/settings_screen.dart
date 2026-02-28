@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../providers/spendly_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/currency_helper.dart';
+import '../database/database_helper.dart';
 import 'category_management_screen.dart';
 import 'recurring_transaction_screen.dart';
 
@@ -92,7 +93,7 @@ class SettingsScreen extends StatelessWidget {
             title: Text('Spendly'),
             subtitle: Text('Track income and expenses. Data stays on your device.'),
           ),
-          _VersionTile(onSeedTestData: _confirmSeedTestData),
+          _VersionTile(onSwitchDatabase: _switchDatabaseFromVersionTap),
           const ListTile(
             title: Text('Created by'),
             subtitle: Text('perutkentang.developer'),
@@ -108,38 +109,23 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _confirmSeedTestData(BuildContext context) {
-    showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const SelectableText('Seed test data?'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SelectableText(
-              'Existing data will be replaced with sample data. Use this to test all features (Dashboard, Report, Frequently Transaction, Reminder).',
-            ),
-          ],
+  Future<void> _switchDatabaseFromVersionTap(BuildContext context) async {
+    final provider = context.read<SpendlyProvider>();
+    final switchedToTest = await provider.toggleActiveDatabase();
+    if (switchedToTest && provider.transactions.isEmpty) {
+      await provider.seedTestData();
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          switchedToTest
+              ? 'Switched to TEST database (${DatabaseHelper.testDbFileName})'
+              : 'Switched to MAIN database (${DatabaseHelper.primaryDbFileName})',
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Seed data'),
-          ),
-        ],
+        backgroundColor: Colors.green,
       ),
-    ).then((ok) async {
-      if (ok == true && context.mounted) {
-        await context.read<SpendlyProvider>().seedTestData();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Test data seeded successfully'), backgroundColor: Colors.green),
-          );
-        }
-      }
-    });
+    );
   }
 
   void _confirmReset(BuildContext context) {
@@ -428,11 +414,11 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-/// Version row: tap 10x to seed test data. Ada animasi klik sebagai feedback.
+/// Version row: tap 10x to switch active database (main/test).
 class _VersionTile extends StatefulWidget {
-  final void Function(BuildContext context) onSeedTestData;
+  final Future<void> Function(BuildContext context) onSwitchDatabase;
 
-  const _VersionTile({required this.onSeedTestData});
+  const _VersionTile({required this.onSwitchDatabase});
 
   @override
   State<_VersionTile> createState() => _VersionTileState();
@@ -473,7 +459,7 @@ class _VersionTileState extends State<_VersionTile>
     _tapCount++;
     if (_tapCount >= 10) {
       _tapCount = 0;
-      widget.onSeedTestData(context);
+      await widget.onSwitchDatabase(context);
     } else {
       _resetTimer = Timer(const Duration(seconds: 2), () {
         if (mounted) setState(() => _tapCount = 0);
@@ -494,9 +480,11 @@ class _VersionTileState extends State<_VersionTile>
           scale: _scaleAnim,
           child: ListTile(
             title: const Text('Version'),
-            subtitle: Text(
-              '1.0.0',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            subtitle: Consumer<SpendlyProvider>(
+              builder: (context, provider, _) => Text(
+                '1.0.0 • ${provider.isUsingTestDatabase ? 'TEST DB' : 'MAIN DB'}',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
             ),
           ),
         ),

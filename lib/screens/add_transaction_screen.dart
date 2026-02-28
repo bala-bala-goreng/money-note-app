@@ -92,6 +92,64 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     });
   }
 
+  Future<bool> _confirmBudgetIfNeeded({
+    required m.Category category,
+    required double amount,
+    required DateTime transactionDate,
+  }) async {
+    if (_isIncome || category.id == null) return true;
+    final budget = category.monthlyBudget;
+    if (budget == null || budget <= 0) return true;
+
+    final provider = context.read<SpendlyProvider>();
+    final spent = await provider.getCategoryExpenseTotalForMonth(
+      category.id!,
+      transactionDate,
+    );
+    final projected = spent + amount;
+    if (projected <= budget) return true;
+    if (!mounted) return false;
+
+    final settings = context.read<SettingsProvider>();
+    final overBy = projected - budget;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Over budget warning'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Category: ${category.name}'),
+            const SizedBox(height: 8),
+            Text('Monthly budget: ${settings.formatAmount(budget)}'),
+            Text('Current spent: ${settings.formatAmount(spent)}'),
+            Text('After this transaction: ${settings.formatAmount(projected)}'),
+            const SizedBox(height: 8),
+            Text(
+              'Over by ${settings.formatAmount(overBy)}. Continue saving?',
+              style: TextStyle(
+                color: Theme.of(dialogContext).colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save anyway'),
+          ),
+        ],
+      ),
+    );
+    return proceed ?? false;
+  }
+
   Future<void> _save() async {
     final desc = _descriptionController.text.trim();
     final amountStr = _amountController.text.trim();
@@ -110,6 +168,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
 
     final transactionDate = DateTime(_date.year, _date.month, _date.day);
+    final canProceed = await _confirmBudgetIfNeeded(
+      category: _selectedCategory!,
+      amount: amount,
+      transactionDate: transactionDate,
+    );
+    if (!canProceed || !mounted) return;
+
     final t = TransactionRecord(
       description: desc.trim(),
       amount: amount,
@@ -228,7 +293,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: _recurring.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final r = _recurring[i];
                     final cat = context.read<SpendlyProvider>().getCategoryById(r.categoryId);

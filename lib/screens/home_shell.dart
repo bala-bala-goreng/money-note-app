@@ -131,10 +131,15 @@ class _HomeShellState extends State<HomeShell> {
         ],
       ),
       bottomNavigationBar: NavigationBar(
+        height: 72,
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         destinations: _navItems
-            .map((e) => NavigationDestination(icon: Icon(e.icon), label: e.label))
+            .map((e) => NavigationDestination(
+                  icon: Icon(e.icon),
+                  selectedIcon: Icon(e.icon, fill: 1),
+                  label: e.label,
+                ))
             .toList(),
       ),
     );

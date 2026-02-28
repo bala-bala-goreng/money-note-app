@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/spendly_provider.dart';
 import '../providers/settings_provider.dart';
@@ -42,7 +44,7 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           ListTile(
-            title: const Text('Manage recurring transaction'),
+            title: const Text('Manage frequently transaction'),
             subtitle: const Text('Income and expense templates'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
@@ -71,6 +73,18 @@ class SettingsScreen extends StatelessWidget {
             subtitle: const Text('Restore from a backup file'),
             trailing: const Icon(Icons.download),
             onTap: () => _importData(context),
+          ),
+          ListTile(
+            title: const Text('Upload backup to Google Drive'),
+            subtitle: const Text('Export then share to Google Drive'),
+            trailing: const Icon(Icons.cloud_upload_outlined),
+            onTap: () => _uploadBackupToGoogleDrive(context),
+          ),
+          ListTile(
+            title: const Text('Import backup from Google Drive'),
+            subtitle: const Text('Pick a .db backup from Google Drive'),
+            trailing: const Icon(Icons.cloud_download_outlined),
+            onTap: () => _importFromGoogleDrive(context),
           ),
           const Divider(height: 1),
           const _SectionLabel('About'),
@@ -104,7 +118,7 @@ class SettingsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SelectableText(
-              'Existing data will be replaced with sample data. Use this to test all features (Dashboard, Report, Recurring, Reminder).',
+              'Existing data will be replaced with sample data. Use this to test all features (Dashboard, Report, Frequently Transaction, Reminder).',
             ),
           ],
         ),
@@ -228,8 +242,7 @@ class SettingsScreen extends StatelessWidget {
     if (proceed != true || !context.mounted) return;
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['db'],
+        type: FileType.any,
         allowMultiple: false,
       );
       if (result == null || result.files.isEmpty || result.files.single.path == null) {
@@ -241,6 +254,118 @@ class SettingsScreen extends StatelessWidget {
         return;
       }
       final path = result.files.single.path!;
+      if (!path.toLowerCase().endsWith('.db')) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select a .db backup file')),
+          );
+        }
+        return;
+      }
+      await context.read<SpendlyProvider>().importData(path);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Data imported'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Import failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _uploadBackupToGoogleDrive(BuildContext context) async {
+    try {
+      final path = await context.read<SpendlyProvider>().exportData();
+      final file = XFile(path);
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [file],
+          text: 'Spendly backup database',
+          title: 'Upload backup',
+        ),
+      );
+      if (context.mounted) {
+        final ok = result.status == ShareResultStatus.success;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              ok
+                  ? 'Backup shared. Choose Google Drive to upload.'
+                  : 'Share was cancelled or unavailable on this device',
+            ),
+            backgroundColor: ok ? Colors.green : null,
+          ),
+        );
+      }
+    } on MissingPluginException {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Share plugin is not ready. Please restart the app and try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } on PlatformException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: ${e.message ?? e.code}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _importFromGoogleDrive(BuildContext context) async {
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const SelectableText('Import from Google Drive?'),
+        content: const SelectableText(
+          'Select a .db backup file from Google Drive. This will replace your current data.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continue')),
+        ],
+      ),
+    );
+    if (proceed != true || !context.mounted) return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        dialogTitle: 'Pick backup from Google Drive',
+        type: FileType.any,
+        allowMultiple: false,
+      );
+      if (result == null || result.files.isEmpty || result.files.single.path == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No file selected')),
+          );
+        }
+        return;
+      }
+      final path = result.files.single.path!;
+      if (!path.toLowerCase().endsWith('.db')) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select a .db backup file')),
+          );
+        }
+        return;
+      }
       await context.read<SpendlyProvider>().importData(path);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

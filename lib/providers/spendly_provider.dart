@@ -128,6 +128,17 @@ class SpendlyProvider extends ChangeNotifier {
   ) =>
       _db.getCategoryTotalsForRange(start, end);
 
+  Future<double> getCategoryExpenseTotalForMonth(
+    int categoryId,
+    DateTime date, {
+    int? excludeTransactionId,
+  }) =>
+      _db.getCategoryExpenseTotalForMonth(
+        categoryId,
+        date,
+        excludeTransactionId: excludeTransactionId,
+      );
+
   Future<String> exportData({String? targetDirectoryPath}) async =>
       _db.exportData(targetDirectoryPath: targetDirectoryPath);
 

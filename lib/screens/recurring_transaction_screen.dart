@@ -7,7 +7,7 @@ import '../utils/category_icons.dart';
 import '../utils/currency_helper.dart';
 import '../utils/decimal_input_formatter.dart';
 
-/// Manage recurring transactions.
+/// Manage frequently transactions.
 /// Split by income and expense. Uses favorite categories only.
 class RecurringTransactionScreen extends StatefulWidget {
   const RecurringTransactionScreen({super.key});
@@ -89,7 +89,7 @@ class _RecurringTransactionScreenState extends State<RecurringTransactionScreen>
           }
 
           return AlertDialog(
-            title: Text(existing == null ? 'Add recurring' : 'Edit recurring'),
+            title: Text(existing == null ? 'Add frequently transaction' : 'Edit frequently transaction'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -271,7 +271,7 @@ class _RecurringTransactionScreenState extends State<RecurringTransactionScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Recurring Transactions'),
+        title: const Text('Frequently Transactions'),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -319,7 +319,7 @@ class _RecurringTransactionScreenState extends State<RecurringTransactionScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete recurring?'),
+        title: const Text('Delete frequently transaction?'),
         content: Text('Remove "${r.description}"?'),
         actions: [
           TextButton(
@@ -389,7 +389,7 @@ class _RecurringTransactionScreenState extends State<RecurringTransactionScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'No recurring ${isIncome ? 'income' : 'expense'} yet.',
+                          'No frequently ${isIncome ? 'income' : 'expense'} transaction yet.',
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
                         const SizedBox(height: 16),
@@ -447,7 +447,7 @@ class _RecurringTransactionScreenState extends State<RecurringTransactionScreen>
               onPressed: categories.isEmpty ? null : onAdd,
               icon: const Icon(Icons.add),
               label: Text(
-                'Add recurring ${isIncome ? 'income' : 'expense'}',
+                'Add frequently ${isIncome ? 'income' : 'expense'} transaction',
               ),
             ),
           ),

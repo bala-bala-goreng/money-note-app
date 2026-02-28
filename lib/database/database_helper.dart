@@ -26,7 +26,7 @@ class DatabaseHelper {
   static const String _dbFileName = 'spendly.db';
 
   /// Increment this when you add schema changes. Migrations run from old to this.
-  static const int dbVersion = 6;
+  static const int dbVersion = 7;
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -130,6 +130,11 @@ class DatabaseHelper {
       );
     }
 
+    // v6 -> v7: monthly_budget on categories
+    if (from < 7) {
+      await addColumnIfMissing(db, 'categories', 'monthly_budget', 'REAL');
+    }
+
     // Add future migrations here, e.g.:
     // if (from < 7) {
     //   await addColumnIfMissing(db, 'transactions', 'notes', 'TEXT');
@@ -142,18 +147,21 @@ class DatabaseHelper {
       'icon_name': 'work',
       'is_income': 1,
       'is_favorite': 0,
+      'monthly_budget': null,
     });
     await db.insert('categories', {
       'name': 'Food',
       'icon_name': 'restaurant',
       'is_income': 0,
       'is_favorite': 0,
+      'monthly_budget': 2000000,
     });
     await db.insert('categories', {
       'name': 'Transport',
       'icon_name': 'local_gas_station',
       'is_income': 0,
       'is_favorite': 0,
+      'monthly_budget': 1000000,
     });
   }
 
@@ -165,7 +173,8 @@ class DatabaseHelper {
         name TEXT NOT NULL,
         icon_name TEXT NOT NULL,
         is_income INTEGER NOT NULL,
-        is_favorite INTEGER NOT NULL DEFAULT 0
+        is_favorite INTEGER NOT NULL DEFAULT 0,
+        monthly_budget REAL
       )
     ''');
 
@@ -220,20 +229,20 @@ class DatabaseHelper {
     );
 
     // Kategori pendapatan (1-4) - ID eksplisit agar cocok dengan category_id di transaksi
-    await db.insert('categories', {'id': 1, 'name': 'Gaji', 'icon_name': 'work', 'is_income': 1, 'is_favorite': 1});
-    await db.insert('categories', {'id': 2, 'name': 'Freelance', 'icon_name': 'payments', 'is_income': 1, 'is_favorite': 0});
-    await db.insert('categories', {'id': 3, 'name': 'Investasi', 'icon_name': 'trending_up', 'is_income': 1, 'is_favorite': 0});
-    await db.insert('categories', {'id': 4, 'name': 'Bonus', 'icon_name': 'card_giftcard', 'is_income': 1, 'is_favorite': 0});
+    await db.insert('categories', {'id': 1, 'name': 'Gaji', 'icon_name': 'work', 'is_income': 1, 'is_favorite': 1, 'monthly_budget': null});
+    await db.insert('categories', {'id': 2, 'name': 'Freelance', 'icon_name': 'payments', 'is_income': 1, 'is_favorite': 0, 'monthly_budget': null});
+    await db.insert('categories', {'id': 3, 'name': 'Investasi', 'icon_name': 'trending_up', 'is_income': 1, 'is_favorite': 0, 'monthly_budget': null});
+    await db.insert('categories', {'id': 4, 'name': 'Bonus', 'icon_name': 'card_giftcard', 'is_income': 1, 'is_favorite': 0, 'monthly_budget': null});
 
     // Kategori pengeluaran (5-12)
-    await db.insert('categories', {'id': 5, 'name': 'Makanan', 'icon_name': 'restaurant', 'is_income': 0, 'is_favorite': 1});
-    await db.insert('categories', {'id': 6, 'name': 'Transportasi', 'icon_name': 'local_gas_station', 'is_income': 0, 'is_favorite': 1});
-    await db.insert('categories', {'id': 7, 'name': 'Sewa Rumah', 'icon_name': 'home', 'is_income': 0, 'is_favorite': 0});
-    await db.insert('categories', {'id': 8, 'name': 'Listrik', 'icon_name': 'receipt_long', 'is_income': 0, 'is_favorite': 0});
-    await db.insert('categories', {'id': 9, 'name': 'Belanja', 'icon_name': 'shopping_cart', 'is_income': 0, 'is_favorite': 1});
-    await db.insert('categories', {'id': 10, 'name': 'Hiburan', 'icon_name': 'movie', 'is_income': 0, 'is_favorite': 0});
-    await db.insert('categories', {'id': 11, 'name': 'Kesehatan', 'icon_name': 'medical_services', 'is_income': 0, 'is_favorite': 0});
-    await db.insert('categories', {'id': 12, 'name': 'Internet', 'icon_name': 'wifi', 'is_income': 0, 'is_favorite': 0});
+    await db.insert('categories', {'id': 5, 'name': 'Makanan', 'icon_name': 'restaurant', 'is_income': 0, 'is_favorite': 1, 'monthly_budget': 2500000});
+    await db.insert('categories', {'id': 6, 'name': 'Transportasi', 'icon_name': 'local_gas_station', 'is_income': 0, 'is_favorite': 1, 'monthly_budget': 1200000});
+    await db.insert('categories', {'id': 7, 'name': 'Sewa Rumah', 'icon_name': 'home', 'is_income': 0, 'is_favorite': 0, 'monthly_budget': 1500000});
+    await db.insert('categories', {'id': 8, 'name': 'Listrik', 'icon_name': 'receipt_long', 'is_income': 0, 'is_favorite': 0, 'monthly_budget': 300000});
+    await db.insert('categories', {'id': 9, 'name': 'Belanja', 'icon_name': 'shopping_cart', 'is_income': 0, 'is_favorite': 1, 'monthly_budget': 1500000});
+    await db.insert('categories', {'id': 10, 'name': 'Hiburan', 'icon_name': 'movie', 'is_income': 0, 'is_favorite': 0, 'monthly_budget': 500000});
+    await db.insert('categories', {'id': 11, 'name': 'Kesehatan', 'icon_name': 'medical_services', 'is_income': 0, 'is_favorite': 0, 'monthly_budget': 400000});
+    await db.insert('categories', {'id': 12, 'name': 'Internet', 'icon_name': 'wifi', 'is_income': 0, 'is_favorite': 0, 'monthly_budget': 250000});
 
     final now = DateTime.now();
     final lastMonth = DateTime(now.year, now.month - 1);
@@ -464,6 +473,40 @@ class DatabaseHelper {
       'SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE is_income = 0',
     );
     return (result.first['total'] as num?)?.toDouble() ?? 0;
+  }
+
+  /// Total expense for one category in the month of [date].
+  Future<double> getCategoryExpenseTotalForMonth(
+    int categoryId,
+    DateTime date, {
+    int? excludeTransactionId,
+  }) async {
+    final db = await database;
+    final start = DateTime(
+      date.year,
+      date.month,
+      1,
+    ).toIso8601String().substring(0, 10);
+    final end = DateTime(
+      date.year,
+      date.month + 1,
+      0,
+    ).toIso8601String().substring(0, 10);
+    final rows = await db.rawQuery(
+      '''
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM transactions
+      WHERE category_id = ?
+        AND is_income = 0
+        AND date(transaction_date) >= ?
+        AND date(transaction_date) <= ?
+        ${excludeTransactionId != null ? 'AND id != ?' : ''}
+      ''',
+      excludeTransactionId != null
+          ? [categoryId, start, end, excludeTransactionId]
+          : [categoryId, start, end],
+    );
+    return (rows.first['total'] as num?)?.toDouble() ?? 0;
   }
 
   /// Daily totals (income, expense) for each date in [start]..[end] (inclusive).

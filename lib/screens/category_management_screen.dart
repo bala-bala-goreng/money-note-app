@@ -35,6 +35,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
 
   void _showCategoryDialog({Category? existing, bool? defaultIsIncome}) {
     final nameController = TextEditingController(text: existing?.name ?? '');
+    final budgetController = TextEditingController(
+      text: existing?.monthlyBudget?.toString() ?? '',
+    );
     String iconName = existing?.iconName ?? 'category';
     bool isIncome = existing?.isIncome ?? defaultIsIncome ?? true;
     bool isFavorite = existing?.isFavorite ?? false;
@@ -53,6 +56,17 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                   decoration: const InputDecoration(labelText: 'Name'),
                   controller: nameController,
                 ),
+                if (!isIncome) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: budgetController,
+                    decoration: const InputDecoration(
+                      labelText: 'Monthly budget',
+                      hintText: 'e.g. 1500000',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 SegmentedButton<bool>(
                   segments: const [
@@ -60,8 +74,12 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                     ButtonSegment(value: false, label: Text('Expense')),
                   ],
                   selected: {isIncome},
-                  onSelectionChanged: (s) =>
-                      setState(() => isIncome = s.first),
+                  onSelectionChanged: (s) => setState(() {
+                    isIncome = s.first;
+                    if (isIncome) {
+                      budgetController.clear();
+                    }
+                  }),
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -111,12 +129,25 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
               onPressed: () async {
                 final name = nameController.text.trim();
                 if (name.isEmpty) return;
+                final budgetRaw = budgetController.text.trim();
+                final parsedBudget = budgetRaw.isEmpty
+                    ? null
+                    : double.tryParse(budgetRaw.replaceAll(',', '.'));
+                if (budgetRaw.isNotEmpty && parsedBudget == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid budget amount')),
+                  );
+                  return;
+                }
                 final cat = Category(
                   id: existing?.id,
                   name: name.trim(),
                   iconName: iconName,
                   isIncome: isIncome,
                   isFavorite: isFavorite,
+                  monthlyBudget: (!isIncome && parsedBudget != null && parsedBudget > 0)
+                      ? parsedBudget
+                      : null,
                 );
                 final provider = context.read<SpendlyProvider>();
                 if (existing == null) {
@@ -208,6 +239,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
             child: Icon(getIconData(c.iconName)),
           ),
           title: Text(c.name),
+          subtitle: (!c.isIncome && c.monthlyBudget != null && c.monthlyBudget! > 0)
+              ? Text('Monthly budget: ${c.monthlyBudget!.toStringAsFixed(0)}')
+              : null,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

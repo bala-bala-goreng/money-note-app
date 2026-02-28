@@ -6,6 +6,7 @@ class Category {
   final String iconName; // e.g. 'food', 'shopping' - maps to Icons.xxx
   final bool isIncome; // true = income category, false = expense category
   final bool isFavorite; // when true, appears first in category lists
+  final double? monthlyBudget; // optional monthly budget (mainly for expense categories)
 
   const Category({
     this.id,
@@ -13,6 +14,7 @@ class Category {
     required this.iconName,
     required this.isIncome,
     this.isFavorite = false,
+    this.monthlyBudget,
   });
 
   /// Convert from database row (Map) to Category object
@@ -23,6 +25,7 @@ class Category {
       iconName: map['icon_name'] as String,
       isIncome: (map['is_income'] as int) == 1,
       isFavorite: (map['is_favorite'] as int?) == 1,
+      monthlyBudget: (map['monthly_budget'] as num?)?.toDouble(),
     );
   }
 
@@ -34,6 +37,7 @@ class Category {
       'icon_name': iconName,
       'is_income': isIncome ? 1 : 0,
       'is_favorite': isFavorite ? 1 : 0,
+      'monthly_budget': monthlyBudget,
     };
   }
 
@@ -43,6 +47,7 @@ class Category {
     String? iconName,
     bool? isIncome,
     bool? isFavorite,
+    double? monthlyBudget,
   }) {
     return Category(
       id: id ?? this.id,
@@ -50,6 +55,7 @@ class Category {
       iconName: iconName ?? this.iconName,
       isIncome: isIncome ?? this.isIncome,
       isFavorite: isFavorite ?? this.isFavorite,
+      monthlyBudget: monthlyBudget ?? this.monthlyBudget,
     );
   }
 }
